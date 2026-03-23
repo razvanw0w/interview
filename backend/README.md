@@ -23,7 +23,7 @@
 ### Goals
 1. Design a CRUD API with data store using Spring Boot and in memory H2 database (pre-configured, see below)
 2. API should include one object with create, read, update, and delete operations. Read should include fetching a single item and list of items.
-3. Provide SQL create scripts for your object(s) in resources/data.sql
+3. Provide SQL create scripts for your object(s) in resources/data-test.sql
 4. Demo API functionality using API client tool
 
 ### Considerations

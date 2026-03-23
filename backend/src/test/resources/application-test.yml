@@ -1,0 +1,4 @@
+test:
+  api:
+    base-path: /api
+    base-url-template: http://localhost:%d${test.api.base-path}
