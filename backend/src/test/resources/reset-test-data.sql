@@ -1,6 +1,7 @@
 DELETE FROM books;
 DELETE FROM authors;
-DELETE from application_users
+DELETE
+from application_users;
 
 INSERT INTO application_users (id, username, password, role, enabled)
 VALUES (1, 'admin', '$2a$10$7of0o4U5CFQLS9epJHSNd.Q81UHpu/rxZFLyeYnXDb9/b0cysgVaC', 'ADMIN', TRUE);

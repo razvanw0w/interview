@@ -1,6 +1,7 @@
 package com.interview.resource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.interview.config.WebMvcTestSecurityConfig;
 import com.interview.dto.BookRequest;
 import com.interview.dto.BookResponse;
 import com.interview.exception.ResourceNotFoundException;
@@ -11,18 +12,21 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(BookResource.class)
-@Import(GlobalExceptionHandler.class)
+@Import({WebMvcTestSecurityConfig.class, GlobalExceptionHandler.class})
 class BookResourceTest {
 
     @Autowired
@@ -34,22 +38,39 @@ class BookResourceTest {
     @MockBean
     private BookService bookService;
 
+    @MockBean
+    private JwtDecoder jwtDecoder;
+
+    private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor userJwt() {
+        return jwt().authorities(() -> "ROLE_USER");
+    }
+
+    private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor adminJwt() {
+        return jwt().authorities(() -> "ROLE_ADMIN");
+    }
+
     @Test
-    void shouldGetAllBooks() throws Exception {
+    void shouldReturnUnauthorizedWhenGettingAllBooksWithoutToken() throws Exception {
+        mockMvc.perform(get("/books"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldGetAllBooksAsUser() throws Exception {
         List<BookResponse> books = List.of(
                 new BookResponse(1L, "Effective Java", "9780134685991", 2018, 1L, "Joshua Bloch")
         );
 
         when(bookService.getAll()).thenReturn(books);
 
-        mockMvc.perform(get("/books"))
+        mockMvc.perform(get("/books").with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Effective Java"))
                 .andExpect(jsonPath("$[0].authorName").value("Joshua Bloch"));
     }
 
     @Test
-    void shouldGetBookById() throws Exception {
+    void shouldGetBookByIdAsUser() throws Exception {
         BookResponse response = new BookResponse(
                 1L,
                 "Effective Java",
@@ -61,20 +82,34 @@ class BookResourceTest {
 
         when(bookService.getById(1L)).thenReturn(response);
 
-        mockMvc.perform(get("/books/1"))
+        mockMvc.perform(get("/books/1").with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.title").value("Effective Java"));
     }
 
     @Test
-    void shouldCreateBook() throws Exception {
+    void shouldForbidCreateBookAsUser() throws Exception {
+        BookRequest request = new BookRequest("Effective Java", "9780134685991", 2018, 1L);
+
+        mockMvc.perform(post("/books")
+                        .with(userJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+
+        verify(bookService, never()).create(any());
+    }
+
+    @Test
+    void shouldCreateBookAsAdmin() throws Exception {
         BookRequest request = new BookRequest("Effective Java", "9780134685991", 2018, 1L);
         BookResponse response = new BookResponse(1L, "Effective Java", "9780134685991", 2018, 1L, "Joshua Bloch");
 
         when(bookService.create(eq(request))).thenReturn(response);
 
         mockMvc.perform(post("/books")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -83,13 +118,27 @@ class BookResourceTest {
     }
 
     @Test
-    void shouldUpdateBook() throws Exception {
+    void shouldForbidUpdateBookAsUser() throws Exception {
+        BookRequest request = new BookRequest("Effective Java 3rd Edition", "9780134685991", 2018, 1L);
+
+        mockMvc.perform(put("/books/1")
+                        .with(userJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+
+        verify(bookService, never()).update(anyLong(), any());
+    }
+
+    @Test
+    void shouldUpdateBookAsAdmin() throws Exception {
         BookRequest request = new BookRequest("Effective Java 3rd Edition", "9780134685991", 2018, 1L);
         BookResponse response = new BookResponse(1L, "Effective Java 3rd Edition", "9780134685991", 2018, 1L, "Joshua Bloch");
 
         when(bookService.update(1L, request)).thenReturn(response);
 
         mockMvc.perform(put("/books/1")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -97,25 +146,33 @@ class BookResourceTest {
     }
 
     @Test
-    void shouldDeleteBook() throws Exception {
+    void shouldForbidDeleteBookAsUser() throws Exception {
+        mockMvc.perform(delete("/books/1").with(userJwt()))
+                .andExpect(status().isForbidden());
+
+        verify(bookService, never()).delete(anyLong());
+    }
+
+    @Test
+    void shouldDeleteBookAsAdmin() throws Exception {
         doNothing().when(bookService).delete(1L);
 
-        mockMvc.perform(delete("/books/1"))
+        mockMvc.perform(delete("/books/1").with(adminJwt()))
                 .andExpect(status().isNoContent());
     }
 
     @Test
-    void shouldReturnNotFoundWhenBookDoesNotExist() throws Exception {
+    void shouldReturnNotFoundWhenBookDoesNotExistAsUser() throws Exception {
         when(bookService.getById(999L))
                 .thenThrow(new ResourceNotFoundException("Book not found with id 999"));
 
-        mockMvc.perform(get("/books/999"))
+        mockMvc.perform(get("/books/999").with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Book not found with id 999"));
     }
 
     @Test
-    void shouldReturnNotFoundWhenUpdatingMissingBook() throws Exception {
+    void shouldReturnNotFoundWhenUpdatingMissingBookAsAdmin() throws Exception {
         BookRequest request = new BookRequest(
                 "Missing Book",
                 "9999999999999",
@@ -127,6 +184,7 @@ class BookResourceTest {
                 .thenThrow(new ResourceNotFoundException("Book not found with id 999"));
 
         mockMvc.perform(put("/books/999")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
@@ -134,17 +192,17 @@ class BookResourceTest {
     }
 
     @Test
-    void shouldReturnNotFoundWhenDeletingMissingBook() throws Exception {
+    void shouldReturnNotFoundWhenDeletingMissingBookAsAdmin() throws Exception {
         doThrow(new ResourceNotFoundException("Book not found with id 999"))
                 .when(bookService).delete(999L);
 
-        mockMvc.perform(delete("/books/999"))
+        mockMvc.perform(delete("/books/999").with(adminJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Book not found with id 999"));
     }
 
     @Test
-    void shouldReturnNotFoundWhenCreatingBookWithMissingAuthor() throws Exception {
+    void shouldReturnNotFoundWhenCreatingBookWithMissingAuthorAsAdmin() throws Exception {
         BookRequest request = new BookRequest(
                 "New Book",
                 "8888888888888",
@@ -156,6 +214,7 @@ class BookResourceTest {
                 .thenThrow(new ResourceNotFoundException("Author not found with id 999"));
 
         mockMvc.perform(post("/books")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
@@ -163,7 +222,7 @@ class BookResourceTest {
     }
 
     @Test
-    void shouldReturnNotFoundWhenUpdatingBookWithMissingAuthor() throws Exception {
+    void shouldReturnNotFoundWhenUpdatingBookWithMissingAuthorAsAdmin() throws Exception {
         BookRequest request = new BookRequest(
                 "Effective Java Updated",
                 "9780134685991",
@@ -175,6 +234,7 @@ class BookResourceTest {
                 .thenThrow(new ResourceNotFoundException("Author not found with id 999"));
 
         mockMvc.perform(put("/books/1")
+                        .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())

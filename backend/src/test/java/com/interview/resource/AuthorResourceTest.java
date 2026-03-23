@@ -1,11 +1,10 @@
 package com.interview.resource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.interview.config.TestSecurityConfig;
+import com.interview.config.WebMvcTestSecurityConfig;
 import com.interview.dto.AuthorRequest;
 import com.interview.dto.AuthorResponse;
 import com.interview.exception.ResourceNotFoundException;
-import com.interview.security.SecurityConfig;
 import com.interview.service.AuthorService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,24 +12,23 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.BDDMockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthorResource.class)
-@Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
+@Import({WebMvcTestSecurityConfig.class, GlobalExceptionHandler.class})
 class AuthorResourceTest {
 
     @Autowired
@@ -66,7 +64,7 @@ class AuthorResourceTest {
                 new AuthorResponse(2L, "Robert C. Martin", "robert.martin@example.com", List.of())
         );
 
-        when(authorService.getAll()).thenReturn(authors);
+        given(authorService.getAll()).willReturn(authors);
 
         mockMvc.perform(get("/authors").with(userJwt()))
                 .andExpect(status().isOk())
@@ -83,7 +81,7 @@ class AuthorResourceTest {
                 List.of()
         );
 
-        when(authorService.getById(1L)).thenReturn(author);
+        given(authorService.getById(1L)).willReturn(author);
 
         mockMvc.perform(get("/authors/1").with(userJwt()))
                 .andExpect(status().isOk())
@@ -109,7 +107,7 @@ class AuthorResourceTest {
         AuthorRequest request = new AuthorRequest("Joshua Bloch", "joshua.bloch@example.com");
         AuthorResponse response = new AuthorResponse(1L, "Joshua Bloch", "joshua.bloch@example.com", List.of());
 
-        when(authorService.create(eq(request))).thenReturn(response);
+        given(authorService.create(eq(request))).willReturn(response);
 
         mockMvc.perform(post("/authors")
                         .with(adminJwt())
@@ -138,7 +136,7 @@ class AuthorResourceTest {
         AuthorRequest request = new AuthorRequest("Updated Name", "updated@example.com");
         AuthorResponse response = new AuthorResponse(1L, "Updated Name", "updated@example.com", List.of());
 
-        when(authorService.update(1L, request)).thenReturn(response);
+        given(authorService.update(1L, request)).willReturn(response);
 
         mockMvc.perform(put("/authors/1")
                         .with(adminJwt())
@@ -166,8 +164,8 @@ class AuthorResourceTest {
 
     @Test
     void shouldReturnNotFoundWhenAuthorDoesNotExistAsUser() throws Exception {
-        when(authorService.getById(999L))
-                .thenThrow(new ResourceNotFoundException("Author not found with id 999"));
+        given(authorService.getById(999L))
+                .willThrow(new ResourceNotFoundException("Author not found with id 999"));
 
         mockMvc.perform(get("/authors/999").with(userJwt()))
                 .andExpect(status().isNotFound())
@@ -176,13 +174,10 @@ class AuthorResourceTest {
 
     @Test
     void shouldReturnNotFoundWhenUpdatingMissingAuthorAsAdmin() throws Exception {
-        AuthorRequest request = new AuthorRequest(
-                "Missing Author",
-                "missing@example.com"
-        );
+        AuthorRequest request = new AuthorRequest("Missing Author", "missing@example.com");
 
-        when(authorService.update(999L, request))
-                .thenThrow(new ResourceNotFoundException("Author not found with id 999"));
+        given(authorService.update(999L, request))
+                .willThrow(new ResourceNotFoundException("Author not found with id 999"));
 
         mockMvc.perform(put("/authors/999")
                         .with(adminJwt())

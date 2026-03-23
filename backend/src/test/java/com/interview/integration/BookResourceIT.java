@@ -5,46 +5,54 @@ import com.interview.dto.BookResponse;
 import com.interview.dto.ErrorResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.jdbc.Sql;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.http.HttpMethod.DELETE;
-import static org.springframework.http.HttpMethod.PUT;
+import static org.springframework.http.HttpMethod.*;
+import static org.springframework.http.HttpStatus.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Sql(scripts = "/reset-test-data.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class BookResourceIT extends BaseHttpIT {
+
+    private static final long EXISTING_BOOK_ID = 1L;
+    private static final long DELETABLE_BOOK_ID = 5L;
+    private static final long EXISTING_AUTHOR_ID = 1L;
+    private static final long MISSING_BOOK_ID = 999999L;
+    private static final long MISSING_AUTHOR_ID = 999999L;
 
     @Autowired
     private TestRestTemplate restTemplate;
 
     @Test
     void shouldGetAllBooks() {
-        ResponseEntity<BookResponse[]> response =
-                restTemplate.getForEntity(baseUrl + "/books", BookResponse[].class);
+        ResponseEntity<BookResponse[]> response = restTemplate.exchange(
+                url("/books"),
+                GET,
+                userEntity(),
+                BookResponse[].class
+        );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode()).isEqualTo(OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().length).isGreaterThanOrEqualTo(5);
+        assertThat(response.getBody()).hasSizeGreaterThanOrEqualTo(5);
     }
 
     @Test
     void shouldGetBookById() {
-        ResponseEntity<BookResponse> response =
-                restTemplate.getForEntity(baseUrl + "/books/1", BookResponse.class);
+        ResponseEntity<BookResponse> response = restTemplate.exchange(
+                url("/books/" + EXISTING_BOOK_ID),
+                GET,
+                userEntity(),
+                BookResponse.class
+        );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode()).isEqualTo(OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().id()).isEqualTo(1L);
+        assertThat(response.getBody().id()).isEqualTo(EXISTING_BOOK_ID);
         assertThat(response.getBody().title()).isEqualTo("Effective Java");
         assertThat(response.getBody().isbn()).isEqualTo("9780134685991");
         assertThat(response.getBody().publishedYear()).isEqualTo(2018);
-        assertThat(response.getBody().authorId()).isEqualTo(1L);
+        assertThat(response.getBody().authorId()).isEqualTo(EXISTING_AUTHOR_ID);
         assertThat(response.getBody().authorName()).isEqualTo("Joshua Bloch");
     }
 
@@ -54,19 +62,23 @@ class BookResourceIT extends BaseHttpIT {
                 "Domain-Driven Design",
                 "9780321125217",
                 2003,
-                1L
+                EXISTING_AUTHOR_ID
         );
 
-        ResponseEntity<BookResponse> response =
-                restTemplate.postForEntity(baseUrl + "/books", request, BookResponse.class);
+        ResponseEntity<BookResponse> response = restTemplate.exchange(
+                url("/books"),
+                POST,
+                adminEntity(request),
+                BookResponse.class
+        );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getStatusCode()).isEqualTo(CREATED);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().id()).isNotNull();
         assertThat(response.getBody().title()).isEqualTo("Domain-Driven Design");
         assertThat(response.getBody().isbn()).isEqualTo("9780321125217");
         assertThat(response.getBody().publishedYear()).isEqualTo(2003);
-        assertThat(response.getBody().authorId()).isEqualTo(1L);
+        assertThat(response.getBody().authorId()).isEqualTo(EXISTING_AUTHOR_ID);
         assertThat(response.getBody().authorName()).isEqualTo("Joshua Bloch");
     }
 
@@ -76,47 +88,55 @@ class BookResourceIT extends BaseHttpIT {
                 "Effective Java 3rd Edition",
                 "9780134685991",
                 2018,
-                1L
+                EXISTING_AUTHOR_ID
         );
 
-        HttpEntity<BookRequest> entity = new HttpEntity<>(request);
+        ResponseEntity<BookResponse> response = restTemplate.exchange(
+                url("/books/" + EXISTING_BOOK_ID),
+                PUT,
+                adminEntity(request),
+                BookResponse.class
+        );
 
-        ResponseEntity<BookResponse> response =
-                restTemplate.exchange(baseUrl + "/books/1", PUT, entity, BookResponse.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode()).isEqualTo(OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().id()).isEqualTo(1L);
+        assertThat(response.getBody().id()).isEqualTo(EXISTING_BOOK_ID);
         assertThat(response.getBody().title()).isEqualTo("Effective Java 3rd Edition");
-        assertThat(response.getBody().authorId()).isEqualTo(1L);
+        assertThat(response.getBody().authorId()).isEqualTo(EXISTING_AUTHOR_ID);
         assertThat(response.getBody().authorName()).isEqualTo("Joshua Bloch");
     }
 
     @Test
     void shouldDeleteBook() {
-        ResponseEntity<Void> deleteResponse =
-                restTemplate.exchange(baseUrl + "/books/5", DELETE, null, Void.class);
+        ResponseEntity<Void> deleteResponse = restTemplate.exchange(
+                url("/books/" + DELETABLE_BOOK_ID),
+                DELETE,
+                adminEntity(),
+                Void.class
+        );
 
-        assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(deleteResponse.getStatusCode()).isEqualTo(NO_CONTENT);
 
-        ResponseEntity<ErrorResponse> getResponse =
-                restTemplate.getForEntity(baseUrl + "/books/5", ErrorResponse.class);
+        ResponseEntity<ErrorResponse> getResponse = restTemplate.exchange(
+                url("/books/" + DELETABLE_BOOK_ID),
+                GET,
+                userEntity(),
+                ErrorResponse.class
+        );
 
-        assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(getResponse.getBody()).isNotNull();
-        assertThat(getResponse.getBody().error()).isEqualTo("Book not found with id 5");
-        assertThat(getResponse.getBody().status()).isEqualTo(404);
+        assertNotFound(getResponse, bookNotFoundMessage(DELETABLE_BOOK_ID));
     }
 
     @Test
     void shouldReturnNotFoundWhenBookDoesNotExist() {
-        ResponseEntity<ErrorResponse> response =
-                restTemplate.getForEntity(baseUrl + "/books/999999", ErrorResponse.class);
+        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
+                url("/books/" + MISSING_BOOK_ID),
+                GET,
+                userEntity(),
+                ErrorResponse.class
+        );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().error()).isEqualTo("Book not found with id 999999");
-        assertThat(response.getBody().status()).isEqualTo(404);
+        assertNotFound(response, bookNotFoundMessage(MISSING_BOOK_ID));
     }
 
     @Test
@@ -125,29 +145,29 @@ class BookResourceIT extends BaseHttpIT {
                 "Missing Book",
                 "9999999999999",
                 2024,
-                1L
+                EXISTING_AUTHOR_ID
         );
 
-        HttpEntity<BookRequest> entity = new HttpEntity<>(request);
+        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
+                url("/books/" + MISSING_BOOK_ID),
+                PUT,
+                adminEntity(request),
+                ErrorResponse.class
+        );
 
-        ResponseEntity<ErrorResponse> response =
-                restTemplate.exchange(baseUrl + "/books/999999", PUT, entity, ErrorResponse.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().error()).isEqualTo("Book not found with id 999999");
-        assertThat(response.getBody().status()).isEqualTo(404);
+        assertNotFound(response, bookNotFoundMessage(MISSING_BOOK_ID));
     }
 
     @Test
     void shouldReturnNotFoundWhenDeletingMissingBook() {
-        ResponseEntity<ErrorResponse> response =
-                restTemplate.exchange(baseUrl + "/books/999999", DELETE, null, ErrorResponse.class);
+        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
+                url("/books/" + MISSING_BOOK_ID),
+                DELETE,
+                adminEntity(),
+                ErrorResponse.class
+        );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().error()).isEqualTo("Book not found with id 999999");
-        assertThat(response.getBody().status()).isEqualTo(404);
+        assertNotFound(response, bookNotFoundMessage(MISSING_BOOK_ID));
     }
 
     @Test
@@ -156,16 +176,17 @@ class BookResourceIT extends BaseHttpIT {
                 "New Book",
                 "8888888888888",
                 2024,
-                999999L
+                MISSING_AUTHOR_ID
         );
 
-        ResponseEntity<ErrorResponse> response =
-                restTemplate.postForEntity(baseUrl + "/books", request, ErrorResponse.class);
+        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
+                url("/books"),
+                POST,
+                adminEntity(request),
+                ErrorResponse.class
+        );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().error()).isEqualTo("Author not found with id 999999");
-        assertThat(response.getBody().status()).isEqualTo(404);
+        assertAuthorNotFound(response, authorNotFoundMessage(MISSING_AUTHOR_ID));
     }
 
     @Test
@@ -174,17 +195,38 @@ class BookResourceIT extends BaseHttpIT {
                 "Effective Java Updated",
                 "9780134685991",
                 2018,
-                999999L
+                MISSING_AUTHOR_ID
         );
 
-        HttpEntity<BookRequest> entity = new HttpEntity<>(request);
+        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
+                url("/books/" + EXISTING_BOOK_ID),
+                PUT,
+                adminEntity(request),
+                ErrorResponse.class
+        );
 
-        ResponseEntity<ErrorResponse> response =
-                restTemplate.exchange(baseUrl + "/books/1", PUT, entity, ErrorResponse.class);
+        assertAuthorNotFound(response, authorNotFoundMessage(MISSING_AUTHOR_ID));
+    }
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    private void assertNotFound(ResponseEntity<ErrorResponse> response, String expectedMessage) {
+        assertThat(response.getStatusCode()).isEqualTo(NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().error()).isEqualTo("Author not found with id 999999");
-        assertThat(response.getBody().status()).isEqualTo(404);
+        assertThat(response.getBody().error()).isEqualTo(expectedMessage);
+        assertThat(response.getBody().status()).isEqualTo(NOT_FOUND.value());
+    }
+
+    private void assertAuthorNotFound(ResponseEntity<ErrorResponse> response, String expectedMessage) {
+        assertThat(response.getStatusCode()).isEqualTo(NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().error()).isEqualTo(expectedMessage);
+        assertThat(response.getBody().status()).isEqualTo(NOT_FOUND.value());
+    }
+
+    private String bookNotFoundMessage(long bookId) {
+        return "Book not found with id " + bookId;
+    }
+
+    private String authorNotFoundMessage(long authorId) {
+        return "Author not found with id " + authorId;
     }
 }

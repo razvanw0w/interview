@@ -5,46 +5,53 @@ import com.interview.dto.AuthorResponse;
 import com.interview.dto.ErrorResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.jdbc.Sql;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.http.HttpMethod.DELETE;
-import static org.springframework.http.HttpMethod.PUT;
-import static org.springframework.http.HttpStatus.OK;
+import static org.springframework.http.HttpMethod.*;
+import static org.springframework.http.HttpStatus.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Sql(scripts = "/reset-test-data.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class AuthorResourceIT extends BaseHttpIT {
+
+    private static final long EXISTING_AUTHOR_ID = 1L;
+    private static final long DELETABLE_AUTHOR_ID = 3L;
+    private static final long MISSING_AUTHOR_ID = 999999L;
+
+    private static final String EXISTING_AUTHOR_NAME = "Joshua Bloch";
+    private static final String EXISTING_AUTHOR_EMAIL = "joshua.bloch@example.com";
 
     @Autowired
     private TestRestTemplate restTemplate;
 
     @Test
     void shouldGetAllAuthors() {
-        ResponseEntity<AuthorResponse[]> response =
-                restTemplate.getForEntity(baseUrl + "/authors", AuthorResponse[].class);
+        ResponseEntity<AuthorResponse[]> response = restTemplate.exchange(
+                url("/authors"),
+                GET,
+                userEntity(),
+                AuthorResponse[].class
+        );
 
         assertThat(response.getStatusCode()).isEqualTo(OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().length).isGreaterThanOrEqualTo(3);
+        assertThat(response.getBody()).hasSizeGreaterThanOrEqualTo(3);
     }
 
     @Test
     void shouldGetAuthorById() {
-        ResponseEntity<AuthorResponse> response =
-                restTemplate.getForEntity(baseUrl + "/authors/1", AuthorResponse.class);
+        ResponseEntity<AuthorResponse> response = restTemplate.exchange(
+                url("/authors/" + EXISTING_AUTHOR_ID),
+                GET,
+                userEntity(),
+                AuthorResponse.class
+        );
 
         assertThat(response.getStatusCode()).isEqualTo(OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().id()).isEqualTo(1L);
-        assertThat(response.getBody().name()).contains("Joshua Bloch");
-        assertThat(response.getBody().email()).isEqualTo("joshua.bloch@example.com");
+        assertThat(response.getBody().id()).isEqualTo(EXISTING_AUTHOR_ID);
+        assertThat(response.getBody().name()).contains(EXISTING_AUTHOR_NAME);
+        assertThat(response.getBody().email()).isEqualTo(EXISTING_AUTHOR_EMAIL);
     }
 
     @Test
@@ -54,10 +61,14 @@ class AuthorResourceIT extends BaseHttpIT {
                 "kent.beck@example.com"
         );
 
-        ResponseEntity<AuthorResponse> response =
-                restTemplate.postForEntity(baseUrl + "/authors", request, AuthorResponse.class);
+        ResponseEntity<AuthorResponse> response = restTemplate.exchange(
+                url("/authors"),
+                POST,
+                adminEntity(request),
+                AuthorResponse.class
+        );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getStatusCode()).isEqualTo(CREATED);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().id()).isNotNull();
         assertThat(response.getBody().name()).isEqualTo("Kent Beck");
@@ -69,46 +80,54 @@ class AuthorResourceIT extends BaseHttpIT {
     void shouldUpdateAuthor() {
         AuthorRequest request = new AuthorRequest(
                 "Joshua Bloch Updated",
-                "joshua.bloch@example.com"
+                EXISTING_AUTHOR_EMAIL
         );
 
-        HttpEntity<AuthorRequest> entity = new HttpEntity<>(request);
-
-        ResponseEntity<AuthorResponse> response =
-                restTemplate.exchange(baseUrl + "/authors/1", PUT, entity, AuthorResponse.class);
+        ResponseEntity<AuthorResponse> response = restTemplate.exchange(
+                url("/authors/" + EXISTING_AUTHOR_ID),
+                PUT,
+                adminEntity(request),
+                AuthorResponse.class
+        );
 
         assertThat(response.getStatusCode()).isEqualTo(OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().id()).isEqualTo(1L);
+        assertThat(response.getBody().id()).isEqualTo(EXISTING_AUTHOR_ID);
         assertThat(response.getBody().name()).isEqualTo("Joshua Bloch Updated");
-        assertThat(response.getBody().email()).isEqualTo("joshua.bloch@example.com");
+        assertThat(response.getBody().email()).isEqualTo(EXISTING_AUTHOR_EMAIL);
     }
 
     @Test
     void shouldDeleteAuthor() {
-        ResponseEntity<Void> deleteResponse =
-                restTemplate.exchange(baseUrl + "/authors/3", DELETE, null, Void.class);
+        ResponseEntity<Void> deleteResponse = restTemplate.exchange(
+                url("/authors/" + DELETABLE_AUTHOR_ID),
+                DELETE,
+                adminEntity(),
+                Void.class
+        );
 
-        assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(deleteResponse.getStatusCode()).isEqualTo(NO_CONTENT);
 
-        ResponseEntity<ErrorResponse> getResponse =
-                restTemplate.getForEntity(baseUrl + "/authors/3", ErrorResponse.class);
+        ResponseEntity<ErrorResponse> getResponse = restTemplate.exchange(
+                url("/authors/" + DELETABLE_AUTHOR_ID),
+                GET,
+                userEntity(),
+                ErrorResponse.class
+        );
 
-        assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(getResponse.getBody()).isNotNull();
-        assertThat(getResponse.getBody().error()).isEqualTo("Author not found with id 3");
-        assertThat(getResponse.getBody().status()).isEqualTo(404);
+        assertNotFound(getResponse, notFoundMessage(DELETABLE_AUTHOR_ID));
     }
 
     @Test
     void shouldReturnNotFoundWhenAuthorDoesNotExist() {
-        ResponseEntity<ErrorResponse> response =
-                restTemplate.getForEntity(baseUrl + "/authors/999999", ErrorResponse.class);
+        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
+                url("/authors/" + MISSING_AUTHOR_ID),
+                GET,
+                userEntity(),
+                ErrorResponse.class
+        );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().error()).isEqualTo("Author not found with id 999999");
-        assertThat(response.getBody().status()).isEqualTo(404);
+        assertNotFound(response, notFoundMessage(MISSING_AUTHOR_ID));
     }
 
     @Test
@@ -118,25 +137,36 @@ class AuthorResourceIT extends BaseHttpIT {
                 "missing@example.com"
         );
 
-        HttpEntity<AuthorRequest> entity = new HttpEntity<>(request);
+        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
+                url("/authors/" + MISSING_AUTHOR_ID),
+                PUT,
+                adminEntity(request),
+                ErrorResponse.class
+        );
 
-        ResponseEntity<ErrorResponse> response =
-                restTemplate.exchange(baseUrl + "/authors/999999", PUT, entity, ErrorResponse.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().error()).isEqualTo("Author not found with id 999999");
-        assertThat(response.getBody().status()).isEqualTo(404);
+        assertNotFound(response, notFoundMessage(MISSING_AUTHOR_ID));
     }
 
     @Test
     void shouldReturnNotFoundWhenDeletingMissingAuthor() {
-        ResponseEntity<ErrorResponse> response =
-                restTemplate.exchange(baseUrl + "/authors/999999", DELETE, null, ErrorResponse.class);
+        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
+                url("/authors/" + MISSING_AUTHOR_ID),
+                DELETE,
+                adminEntity(),
+                ErrorResponse.class
+        );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertNotFound(response, notFoundMessage(MISSING_AUTHOR_ID));
+    }
+
+    private void assertNotFound(ResponseEntity<ErrorResponse> response, String expectedMessage) {
+        assertThat(response.getStatusCode()).isEqualTo(NOT_FOUND);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().error()).isEqualTo("Author not found with id 999999");
-        assertThat(response.getBody().status()).isEqualTo(404);
+        assertThat(response.getBody().error()).isEqualTo(expectedMessage);
+        assertThat(response.getBody().status()).isEqualTo(NOT_FOUND.value());
+    }
+
+    private String notFoundMessage(long authorId) {
+        return "Author not found with id " + authorId;
     }
 }
