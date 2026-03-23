@@ -1,5 +1,12 @@
 DELETE FROM books;
 DELETE FROM authors;
+DELETE from application_users
+
+INSERT INTO application_users (id, username, password, role, enabled)
+VALUES (1, 'admin', '$2a$10$7of0o4U5CFQLS9epJHSNd.Q81UHpu/rxZFLyeYnXDb9/b0cysgVaC', 'ADMIN', TRUE);
+
+INSERT INTO application_users (id, username, password, role, enabled)
+VALUES (2, 'user', '$2a$10$R1hUh3ODwl5dUeRR2cmv4ugiL7MMWf5TI/gYmM6IPiXFDa9PcXhm6', 'USER', TRUE);
 
 INSERT INTO authors (id, name, email, created_at, updated_at)
 VALUES (1, 'Joshua Bloch', 'joshua.bloch@example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

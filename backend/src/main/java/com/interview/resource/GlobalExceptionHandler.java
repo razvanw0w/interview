@@ -4,6 +4,7 @@ import com.interview.dto.ErrorResponse;
 import com.interview.exception.ResourceNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -25,5 +26,11 @@ public class GlobalExceptionHandler {
                 request.getRequestURI(),
                 Instant.now()
         );
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleBadCredentials(BadCredentialsException ex, HttpServletRequest request) {
+        return new ErrorResponse("Invalid username or password", 401, request.getRequestURI(), Instant.now());
     }
 }

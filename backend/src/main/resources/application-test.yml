@@ -10,3 +10,13 @@ spring:
   sql:
     init:
       data-locations: classpath:db/data-test.sql
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          public-key-location: classpath:keys/test-public.pem
+
+security:
+  jwt:
+    private-key-location: classpath:keys/test-private.pem
+    expiration-seconds: 3600

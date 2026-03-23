@@ -10,8 +10,18 @@ spring:
   sql:
     init:
       data-locations: classpath:db/data-prod.sql
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          public-key-location: classpath:keys/prod-public.pem
 
 management:
   endpoint:
     health:
       show-details: never
+
+security:
+  jwt:
+    private-key-location: classpath:keys/prod-private.pem
+    expiration-seconds: 3600

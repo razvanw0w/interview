@@ -1,31 +1,36 @@
 package com.interview.resource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.interview.config.TestSecurityConfig;
 import com.interview.dto.AuthorRequest;
 import com.interview.dto.AuthorResponse;
 import com.interview.exception.ResourceNotFoundException;
+import com.interview.security.SecurityConfig;
 import com.interview.service.AuthorService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthorResource.class)
-@Import(GlobalExceptionHandler.class)
+@Import({TestSecurityConfig.class, GlobalExceptionHandler.class})
 class AuthorResourceTest {
 
     @Autowired
@@ -37,8 +42,25 @@ class AuthorResourceTest {
     @MockBean
     private AuthorService authorService;
 
+    @MockBean
+    private JwtDecoder jwtDecoder;
+
+    private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor userJwt() {
+        return jwt().authorities(() -> "ROLE_USER");
+    }
+
+    private SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor adminJwt() {
+        return jwt().authorities(() -> "ROLE_ADMIN");
+    }
+
     @Test
-    void shouldGetAllAuthors() throws Exception {
+    void shouldReturnUnauthorizedWhenGettingAllAuthorsWithoutToken() throws Exception {
+        mockMvc.perform(get("/authors"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldGetAllAuthorsAsUser() throws Exception {
         List<AuthorResponse> authors = List.of(
                 new AuthorResponse(1L, "Joshua Bloch", "joshua.bloch@example.com", List.of()),
                 new AuthorResponse(2L, "Robert C. Martin", "robert.martin@example.com", List.of())
@@ -46,14 +68,14 @@ class AuthorResourceTest {
 
         when(authorService.getAll()).thenReturn(authors);
 
-        mockMvc.perform(get("/authors"))
+        mockMvc.perform(get("/authors").with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Joshua Bloch"))
                 .andExpect(jsonPath("$[1].name").value("Robert C. Martin"));
     }
 
     @Test
-    void shouldGetAuthorById() throws Exception {
+    void shouldGetAuthorByIdAsUser() throws Exception {
         AuthorResponse author = new AuthorResponse(
                 1L,
                 "Joshua Bloch",
@@ -63,20 +85,34 @@ class AuthorResourceTest {
 
         when(authorService.getById(1L)).thenReturn(author);
 
-        mockMvc.perform(get("/authors/1"))
+        mockMvc.perform(get("/authors/1").with(userJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("Joshua Bloch"));
     }
 
     @Test
-    void shouldCreateAuthor() throws Exception {
+    void shouldForbidCreateAuthorAsUser() throws Exception {
+        AuthorRequest request = new AuthorRequest("Joshua Bloch", "joshua.bloch@example.com");
+
+        mockMvc.perform(post("/authors")
+                        .with(userJwt())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+
+        verify(authorService, never()).create(any());
+    }
+
+    @Test
+    void shouldCreateAuthorAsAdmin() throws Exception {
         AuthorRequest request = new AuthorRequest("Joshua Bloch", "joshua.bloch@example.com");
         AuthorResponse response = new AuthorResponse(1L, "Joshua Bloch", "joshua.bloch@example.com", List.of());
 
         when(authorService.create(eq(request))).thenReturn(response);
 
         mockMvc.perform(post("/authors")
+                        .with(adminJwt())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -85,13 +121,27 @@ class AuthorResourceTest {
     }
 
     @Test
-    void shouldUpdateAuthor() throws Exception {
+    void shouldForbidUpdateAuthorAsUser() throws Exception {
+        AuthorRequest request = new AuthorRequest("Updated Name", "updated@example.com");
+
+        mockMvc.perform(put("/authors/1")
+                        .with(userJwt())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+
+        verify(authorService, never()).update(anyLong(), any());
+    }
+
+    @Test
+    void shouldUpdateAuthorAsAdmin() throws Exception {
         AuthorRequest request = new AuthorRequest("Updated Name", "updated@example.com");
         AuthorResponse response = new AuthorResponse(1L, "Updated Name", "updated@example.com", List.of());
 
         when(authorService.update(1L, request)).thenReturn(response);
 
         mockMvc.perform(put("/authors/1")
+                        .with(adminJwt())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -99,25 +149,33 @@ class AuthorResourceTest {
     }
 
     @Test
-    void shouldDeleteAuthor() throws Exception {
+    void shouldForbidDeleteAuthorAsUser() throws Exception {
+        mockMvc.perform(delete("/authors/1").with(userJwt()))
+                .andExpect(status().isForbidden());
+
+        verify(authorService, never()).delete(anyLong());
+    }
+
+    @Test
+    void shouldDeleteAuthorAsAdmin() throws Exception {
         doNothing().when(authorService).delete(1L);
 
-        mockMvc.perform(delete("/authors/1"))
+        mockMvc.perform(delete("/authors/1").with(adminJwt()))
                 .andExpect(status().isNoContent());
     }
 
     @Test
-    void shouldReturnNotFoundWhenAuthorDoesNotExist() throws Exception {
+    void shouldReturnNotFoundWhenAuthorDoesNotExistAsUser() throws Exception {
         when(authorService.getById(999L))
                 .thenThrow(new ResourceNotFoundException("Author not found with id 999"));
 
-        mockMvc.perform(get("/authors/999"))
+        mockMvc.perform(get("/authors/999").with(userJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Author not found with id 999"));
     }
 
     @Test
-    void shouldReturnNotFoundWhenUpdatingMissingAuthor() throws Exception {
+    void shouldReturnNotFoundWhenUpdatingMissingAuthorAsAdmin() throws Exception {
         AuthorRequest request = new AuthorRequest(
                 "Missing Author",
                 "missing@example.com"
@@ -127,6 +185,7 @@ class AuthorResourceTest {
                 .thenThrow(new ResourceNotFoundException("Author not found with id 999"));
 
         mockMvc.perform(put("/authors/999")
+                        .with(adminJwt())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound())
@@ -134,11 +193,11 @@ class AuthorResourceTest {
     }
 
     @Test
-    void shouldReturnNotFoundWhenDeletingMissingAuthor() throws Exception {
+    void shouldReturnNotFoundWhenDeletingMissingAuthorAsAdmin() throws Exception {
         doThrow(new ResourceNotFoundException("Author not found with id 999"))
                 .when(authorService).delete(999L);
 
-        mockMvc.perform(delete("/authors/999"))
+        mockMvc.perform(delete("/authors/999").with(adminJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Author not found with id 999"));
     }
