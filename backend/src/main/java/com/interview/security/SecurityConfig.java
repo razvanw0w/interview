@@ -25,13 +25,29 @@ public class SecurityConfig {
     private final CustomAuthenticationEntryPoint authenticationEntryPoint;
     private final CustomAccessDeniedHandler accessDeniedHandler;
 
+    private static final String[] PUBLIC_AUTH_ENDPOINTS = {
+            "/login"
+    };
+
+    private static final String[] PUBLIC_ACTUATOR_ENDPOINTS = {
+            "/actuator/health",
+            "/actuator/health/**",
+            "/actuator/prometheus"
+    };
+
+    private static final String[] PUBLIC_DOCS_ENDPOINTS = {
+            "/v3/api-docs/**",
+            "/swagger-ui.html",
+            "/swagger-ui/**"
+    };
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login").permitAll()
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
+                        .requestMatchers(PUBLIC_AUTH_ENDPOINTS).permitAll()
+                        .requestMatchers(PUBLIC_ACTUATOR_ENDPOINTS).permitAll()
+                        .requestMatchers(PUBLIC_DOCS_ENDPOINTS).permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

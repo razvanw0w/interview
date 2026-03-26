@@ -12,6 +12,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -90,7 +94,7 @@ class BookServiceTest {
     }
 
     @Test
-    void shouldReturnAllBooks() {
+    void shouldMapBooksFromPageToResponses() {
         Author author = Author.builder()
                 .id(1L)
                 .name("Joshua Bloch")
@@ -106,14 +110,34 @@ class BookServiceTest {
                 .author(author)
                 .build();
 
-        when(bookRepository.findAll()).thenReturn(List.of(book));
+        Pageable pageable = PageRequest.of(0, 1);
+        Page<Book> bookPage = new PageImpl<>(List.of(book), pageable, 1);
 
-        List<BookResponse> responses = bookService.getAll();
+        when(bookRepository.findAll(pageable)).thenReturn(bookPage);
 
-        assertEquals(1, responses.size());
-        assertEquals("Effective Java", responses.get(0).title());
-        assertEquals("Joshua Bloch", responses.get(0).authorName());
-        verify(bookRepository).findAll();
+        Page<BookResponse> responses = bookService.getAll(pageable);
+
+        assertEquals("Effective Java", responses.getContent().get(0).title());
+        assertEquals("Joshua Bloch", responses.getContent().get(0).authorName());
+
+        verify(bookRepository).findAll(pageable);
+    }
+
+    @Test
+    void shouldReturnBooksPaginationMetadata() {
+        Pageable pageable = PageRequest.of(0, 2);
+        Page<Book> bookPage = new PageImpl<>(List.of(), pageable, 5);
+
+        when(bookRepository.findAll(pageable)).thenReturn(bookPage);
+
+        Page<BookResponse> responses = bookService.getAll(pageable);
+
+        assertEquals(5, responses.getTotalElements());
+        assertEquals(3, responses.getTotalPages());
+        assertEquals(0, responses.getNumber());
+        assertEquals(2, responses.getSize());
+
+        verify(bookRepository).findAll(pageable);
     }
 
     @Test

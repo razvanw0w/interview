@@ -3,9 +3,11 @@ package com.interview.integration;
 import com.interview.dto.AuthorRequest;
 import com.interview.dto.AuthorResponse;
 import com.interview.dto.ErrorResponse;
+import com.interview.dto.RestPagedResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,16 +28,19 @@ class AuthorResourceIT extends BaseHttpIT {
 
     @Test
     void shouldGetAllAuthors() {
-        ResponseEntity<AuthorResponse[]> response = restTemplate.exchange(
-                url("/authors"),
+        ResponseEntity<RestPagedResponse<AuthorResponse>> response = restTemplate.exchange(
+                url("/authors?page=0&size=10&sort=id,asc"),
                 GET,
                 userEntity(),
-                AuthorResponse[].class
+                new ParameterizedTypeReference<>() {}
         );
 
         assertThat(response.getStatusCode()).isEqualTo(OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody()).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(response.getBody().content()).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(response.getBody().page().totalElements()).isGreaterThanOrEqualTo(3);
+        assertThat(response.getBody().page().number()).isEqualTo(0);
+        assertThat(response.getBody().page().size()).isEqualTo(10);
     }
 
     @Test

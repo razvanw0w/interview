@@ -10,6 +10,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -52,7 +56,7 @@ class AuthorServiceTest {
     }
 
     @Test
-    void shouldReturnAllAuthors() {
+    void shouldMapAuthorsFromPageToResponses() {
         Author author1 = Author.builder()
                 .id(1L)
                 .name("Joshua Bloch")
@@ -67,14 +71,34 @@ class AuthorServiceTest {
                 .books(new ArrayList<>())
                 .build();
 
-        when(authorRepository.findAll()).thenReturn(List.of(author1, author2));
+        Pageable pageable = PageRequest.of(0, 2);
+        Page<Author> authorPage = new PageImpl<>(List.of(author1, author2), pageable, 2);
 
-        List<AuthorResponse> responses = authorService.getAll();
+        when(authorRepository.findAll(pageable)).thenReturn(authorPage);
 
-        assertEquals(2, responses.size());
-        assertEquals("Joshua Bloch", responses.get(0).name());
-        assertEquals("Robert C. Martin", responses.get(1).name());
-        verify(authorRepository).findAll();
+        Page<AuthorResponse> responses = authorService.getAll(pageable);
+
+        assertEquals("Joshua Bloch", responses.getContent().get(0).name());
+        assertEquals("Robert C. Martin", responses.getContent().get(1).name());
+
+        verify(authorRepository).findAll(pageable);
+    }
+
+    @Test
+    void shouldReturnPaginationMetadata() {
+        Pageable pageable = PageRequest.of(0, 2);
+        Page<Author> authorPage = new PageImpl<>(List.of(), pageable, 5);
+
+        when(authorRepository.findAll(pageable)).thenReturn(authorPage);
+
+        Page<AuthorResponse> responses = authorService.getAll(pageable);
+
+        assertEquals(5, responses.getTotalElements());
+        assertEquals(3, responses.getTotalPages());
+        assertEquals(0, responses.getNumber());
+        assertEquals(2, responses.getSize());
+
+        verify(authorRepository).findAll(pageable);
     }
 
     @Test

@@ -3,9 +3,11 @@ package com.interview.integration;
 import com.interview.dto.BookRequest;
 import com.interview.dto.BookResponse;
 import com.interview.dto.ErrorResponse;
+import com.interview.dto.RestPagedResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.ResponseEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,16 +27,19 @@ class BookResourceIT extends BaseHttpIT {
 
     @Test
     void shouldGetAllBooks() {
-        ResponseEntity<BookResponse[]> response = restTemplate.exchange(
-                url("/books"),
+        ResponseEntity<RestPagedResponse<BookResponse>> response = restTemplate.exchange(
+                url("/books?page=0&size=10&sort=id,asc"),
                 GET,
                 userEntity(),
-                BookResponse[].class
+                new ParameterizedTypeReference<>() {}
         );
 
         assertThat(response.getStatusCode()).isEqualTo(OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody()).hasSizeGreaterThanOrEqualTo(5);
+        assertThat(response.getBody().content()).hasSizeGreaterThanOrEqualTo(5);
+        assertThat(response.getBody().page().totalElements()).isGreaterThanOrEqualTo(5);
+        assertThat(response.getBody().page().number()).isEqualTo(0);
+        assertThat(response.getBody().page().size()).isEqualTo(10);
     }
 
     @Test

@@ -8,6 +8,10 @@ import com.interview.exception.ResourceNotFoundException;
 import com.interview.repository.AuthorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -33,27 +37,31 @@ public class AuthorService {
         return response;
     }
 
-    public List<AuthorResponse> getAll() {
-        log.info("Fetching all authors");
+    public Page<AuthorResponse> getAll(Pageable pageable) {
+        log.info("Fetching authors page={} size={} sort={}",
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                pageable.getSort());
 
-        List<AuthorResponse> responses = authorRepository.findAll()
-                .stream()
-                .map(AuthorService::toResponse)
-                .toList();
+        Page<AuthorResponse> responses = authorRepository.findAll(pageable)
+                .map(AuthorService::toResponse);
 
-        log.info("Fetched {} authors", responses.size());
+        log.info("Fetched {} authors on current page, totalElements={}",
+                responses.getNumberOfElements(),
+                responses.getTotalElements());
+
         return responses;
     }
 
+    @Cacheable(value = "authorById", key = "#id")
     public AuthorResponse getById(Long id) {
         log.info("Fetching author by id={}", id);
-
         AuthorResponse response = toResponse(findAuthor(id));
         log.info("Fetched author id={}", id);
-
         return response;
     }
 
+    @CacheEvict(value = "authorById", key = "#id")
     public AuthorResponse update(Long id, AuthorRequest request) {
         log.info("Updating author id={} with email={}", id, request.email());
 
@@ -67,6 +75,7 @@ public class AuthorService {
         return response;
     }
 
+    @CacheEvict(value = "authorById", key = "#id")
     public void delete(Long id) {
         log.info("Deleting author id={}", id);
 

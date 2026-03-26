@@ -11,6 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
@@ -56,17 +60,33 @@ class BookResourceTest {
     }
 
     @Test
-    void shouldGetAllBooksAsUser() throws Exception {
+    void shouldGetBooksPageContentAsUser() throws Exception {
         List<BookResponse> books = List.of(
                 new BookResponse(1L, "Effective Java", "9780134685991", 2018, 1L, "Joshua Bloch")
         );
 
-        when(bookService.getAll()).thenReturn(books);
+        Page<BookResponse> page = new PageImpl<>(books, PageRequest.of(0, 1), 1);
 
-        mockMvc.perform(get("/books").with(userJwt()))
+        when(bookService.getAll(any(Pageable.class))).thenReturn(page);
+
+        mockMvc.perform(get("/books?page=0&size=1").with(userJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].title").value("Effective Java"))
-                .andExpect(jsonPath("$[0].authorName").value("Joshua Bloch"));
+                .andExpect(jsonPath("$.content[0].title").value("Effective Java"))
+                .andExpect(jsonPath("$.content[0].authorName").value("Joshua Bloch"));
+    }
+
+    @Test
+    void shouldReturnBooksPaginationMetadataAsUser() throws Exception {
+        Page<BookResponse> page = new PageImpl<>(List.of(), PageRequest.of(0, 5), 12);
+
+        when(bookService.getAll(any(Pageable.class))).thenReturn(page);
+
+        mockMvc.perform(get("/books?page=0&size=5").with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(12))
+                .andExpect(jsonPath("$.totalPages").value(3))
+                .andExpect(jsonPath("$.number").value(0))
+                .andExpect(jsonPath("$.size").value(5));
     }
 
     @Test

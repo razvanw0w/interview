@@ -1,5 +1,6 @@
 package com.interview.service;
 
+import com.interview.dto.AuthorResponse;
 import com.interview.dto.BookRequest;
 import com.interview.dto.BookResponse;
 import com.interview.entity.Author;
@@ -9,6 +10,10 @@ import com.interview.repository.AuthorRepository;
 import com.interview.repository.BookRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -43,18 +48,23 @@ public class BookService {
         return response;
     }
 
-    public List<BookResponse> getAll() {
-        log.info("Fetching all books");
+    public Page<BookResponse> getAll(Pageable pageable) {
+        log.info("Fetching books page={} size={} sort={}",
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                pageable.getSort());
 
-        List<BookResponse> responses = bookRepository.findAll()
-                .stream()
-                .map(BookService::toResponse)
-                .toList();
+        Page<BookResponse> responses = bookRepository.findAll(pageable)
+                .map(BookService::toResponse);
 
-        log.info("Fetched {} books", responses.size());
+        log.info("Fetched {} books on current page, totalElements={}",
+                responses.getNumberOfElements(),
+                responses.getTotalElements());
+
         return responses;
     }
 
+    @Cacheable(value = "bookById", key = "#id")
     public BookResponse getById(Long id) {
         log.info("Fetching book by id={}", id);
 
@@ -64,6 +74,7 @@ public class BookService {
         return response;
     }
 
+    @CacheEvict(value = "bookById", key = "#id")
     public BookResponse update(Long id, BookRequest request) {
         log.info("Updating book id={} with isbn={} and authorId={}", id, request.isbn(), request.authorId());
 
@@ -86,6 +97,7 @@ public class BookService {
         return response;
     }
 
+    @CacheEvict(value = "bookById", key = "#id")
     public void delete(Long id) {
         log.info("Deleting book id={}", id);
 

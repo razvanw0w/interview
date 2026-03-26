@@ -15,6 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 public class WebMvcTestSecurityConfig {
 
     private static final String HEALTH_ENDPOINT = "/actuator/health";
+    private static final String PROMETHEUS_ENDPOINT = "/actuator/prometheus";
     private static final String HEALTH_ENDPOINT_ALL = "/actuator/health/**";
 
     private static final String AUTHORS_API = "/authors/**";
@@ -31,7 +32,7 @@ public class WebMvcTestSecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> {
-                    auth.requestMatchers(HEALTH_ENDPOINT, HEALTH_ENDPOINT_ALL).permitAll();
+                    auth.requestMatchers(HEALTH_ENDPOINT, HEALTH_ENDPOINT_ALL, PROMETHEUS_ENDPOINT).permitAll();
                     configureCrudAccess(auth, AUTHORS_API);
                     configureCrudAccess(auth, BOOKS_API);
                     auth.anyRequest().authenticated();

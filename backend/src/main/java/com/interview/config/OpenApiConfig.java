@@ -11,7 +11,7 @@ public class OpenApiConfig {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Interview API")
+                        .title("Authors/Books API")
                         .version("1.0")
                         .description("REST API for authors and books"));
     }

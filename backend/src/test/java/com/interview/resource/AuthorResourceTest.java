@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.*;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
@@ -58,18 +59,73 @@ class AuthorResourceTest {
     }
 
     @Test
-    void shouldGetAllAuthorsAsUser() throws Exception {
+    void shouldGetFirstPageOfAuthorsAsUser() throws Exception {
         List<AuthorResponse> authors = List.of(
                 new AuthorResponse(1L, "Joshua Bloch", "joshua.bloch@example.com", List.of()),
                 new AuthorResponse(2L, "Robert C. Martin", "robert.martin@example.com", List.of())
         );
 
-        given(authorService.getAll()).willReturn(authors);
+        Page<AuthorResponse> page = new PageImpl<>(
+                authors,
+                PageRequest.of(0, 2, Sort.by("id").ascending()),
+                2
+        );
 
-        mockMvc.perform(get("/authors").with(userJwt()))
+        given(authorService.getAll(any(Pageable.class))).willReturn(page);
+
+        mockMvc.perform(get("/authors?page=0&size=2&sort=id,asc").with(userJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Joshua Bloch"))
-                .andExpect(jsonPath("$[1].name").value("Robert C. Martin"));
+                .andExpect(jsonPath("$.content[0].name").value("Joshua Bloch"))
+                .andExpect(jsonPath("$.content[1].name").value("Robert C. Martin"))
+                .andExpect(jsonPath("$.content[0].email").value("joshua.bloch@example.com"))
+                .andExpect(jsonPath("$.content[1].email").value("robert.martin@example.com"));
+    }
+
+    @Test
+    void shouldReturnPaginationMetadataWhenGettingAuthorsAsUser() throws Exception {
+        List<AuthorResponse> authors = List.of(
+                new AuthorResponse(1L, "Joshua Bloch", "joshua.bloch@example.com", List.of()),
+                new AuthorResponse(2L, "Robert C. Martin", "robert.martin@example.com", List.of())
+        );
+
+        Page<AuthorResponse> page = new PageImpl<>(
+                authors,
+                PageRequest.of(0, 2, Sort.by("id").ascending()),
+                5
+        );
+
+        given(authorService.getAll(any(Pageable.class))).willReturn(page);
+
+        mockMvc.perform(get("/authors?page=0&size=2&sort=id,asc").with(userJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.number").value(0))
+                .andExpect(jsonPath("$.size").value(2))
+                .andExpect(jsonPath("$.totalElements").value(5))
+                .andExpect(jsonPath("$.totalPages").value(3))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(false))
+                .andExpect(jsonPath("$.numberOfElements").value(2));
+    }
+
+    @Test
+    void shouldPassPageableToServiceWhenGettingAuthorsAsUser() throws Exception {
+        Page<AuthorResponse> page = new PageImpl<>(
+                List.of(),
+                PageRequest.of(1, 5, Sort.by("name").descending()),
+                0
+        );
+
+        given(authorService.getAll(any(Pageable.class))).willReturn(page);
+
+        mockMvc.perform(get("/authors?page=1&size=5&sort=name,desc").with(userJwt()))
+                .andExpect(status().isOk());
+
+        then(authorService).should().getAll(argThat(pageable ->
+                pageable.getPageNumber() == 1 &&
+                        pageable.getPageSize() == 5 &&
+                        pageable.getSort().getOrderFor("name") != null &&
+                        pageable.getSort().getOrderFor("name").isDescending()
+        ));
     }
 
     @Test

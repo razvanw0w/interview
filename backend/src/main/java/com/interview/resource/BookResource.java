@@ -8,6 +8,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -42,11 +47,15 @@ public class BookResource {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @Operation(
             summary = "Get all books",
-            description = "Returns all books. Requires USER or ADMIN role."
+            description = "Returns paginated books. Supports pagination and sorting. Requires USER or ADMIN role."
     )
     @OkApiResponse
-    public List<BookResponse> getAll() {
-        return bookService.getAll();
+    public Page<BookResponse> getAll(
+            @ParameterObject
+            @PageableDefault(page = 0, size = 20, sort = "id", direction = Sort.Direction.ASC)
+            Pageable pageable
+    ) {
+        return bookService.getAll(pageable);
     }
 
     @GetMapping("/{id}")

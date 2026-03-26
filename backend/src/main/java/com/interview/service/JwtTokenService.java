@@ -5,8 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -46,8 +46,12 @@ public class JwtTokenService {
     }
 
     private PrivateKey loadPrivateKey(Resource resource) throws Exception {
-        String pem = Files.readString(resource.getFile().toPath(), StandardCharsets.UTF_8)
-                .replace("-----BEGIN PRIVATE KEY-----", "")
+        String pem;
+        try (InputStream inputStream = resource.getInputStream()) {
+            pem = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+
+        pem = pem.replace("-----BEGIN PRIVATE KEY-----", "")
                 .replace("-----END PRIVATE KEY-----", "")
                 .replaceAll("\\s+", "");
 
