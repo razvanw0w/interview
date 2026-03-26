@@ -1,39 +1,89 @@
-# Java Spring Boot API Coding Exercise
+README.md
 
-## Steps to get started:
+# Authors / Books API
 
-#### Prerequisites
-- Maven
-- Java 1.8 (or higher, update version in pom.xml if needed)
+A Spring Boot REST API for managing authors and books, built to showcase secure CRUD design, pageable endpoints, Redis
+caching, containerization, observability, and load testing.
 
-#### Fork the repository and clone it locally
-- https://github.com/Tekmetric/interview.git
+This project goes beyond a basic CRUD exercise by including:
 
-#### Import project into IDE
-- Project root is located in `backend` folder
+- JWT-based authentication
+- role-based authorization with `USER` and `ADMIN`
+- pagination and sorting on list endpoints
+- Redis caching for `getById` operations
+- Docker Compose orchestration
+- Prometheus metrics and Grafana dashboards
+- integration, unit, and k6 load tests
 
-#### Build and run your app
-- `mvn package && java -jar target/interview-1.0-SNAPSHOT.jar`
+## Main capabilities
 
-#### Test that your app is running
-- `curl -X GET   http://localhost:8080/api/welcome`
+- Manage authors and books through REST endpoints
+- Authenticate with `/api/login` and call protected APIs with bearer tokens
+- Read paginated and sorted collections
+- Cache hot `getById` lookups in Redis
+- Inspect health and metrics through Actuator
+- Visualize metrics with Prometheus and Grafana
+- Exercise the API under load with k6
 
-#### After finishing the goals listed below create a PR
+## Technical stack
 
-### Goals
-1. Design a CRUD API with data store using Spring Boot and in memory H2 database (pre-configured, see below)
-2. API should include one object with create, read, update, and delete operations. Read should include fetching a single item and list of items.
-3. Provide SQL create scripts for your object(s) in resources/data-test.sql
-4. Demo API functionality using API client tool
+- Java 21
+- Spring Boot 3
+- Spring Web
+- Spring Security
+- Spring Data JPA
+- H2
+- Redis
+- Docker / Docker Compose
+- Prometheus
+- Grafana
+- k6
+- springdoc OpenAPI
 
-### Considerations
-This is an open ended exercise for you to showcase what you know! We encourage you to think about best practices for structuring your code and handling different scenarios. Feel free to include additional improvements that you believe are important.
+## Project structure
 
-#### H2 Configuration
-- Console: http://localhost:8080/h2-console 
-- JDBC URL: jdbc:h2:mem:testdb
-- Username: sa
-- Password: password
+- `backend/` — Spring Boot application
+- `observability/` — Prometheus and Grafana provisioning
+- `qa/k6/` — load test scripts
+- `testing/results/` — result screenshots and test artifacts
+- `docs/` — supporting project documentation
 
-### Submitting your coding exercise
-Once you have finished the coding exercise please create a PR into Tekmetric/interview
+## Documentation
+
+- [Run locally](docs/README.local.md)
+- [API guide](docs/README.api.md)
+- [Docker guide](docs/README.docker.md)
+- [Observability guide](docs/README.observability.md)
+- [Testing guide](docs/README.testing.md)
+- [Load testing guide](docs/README.load-testing.md)
+
+## Quick start
+
+Start the full stack:
+
+```bash
+docker compose up --build
+```
+
+Important URLs:
+
+- API: `http://localhost:8080/api`
+- Swagger UI: `http://localhost:8080/api/swagger-ui/index.html`
+- OpenAPI docs: `http://localhost:8080/api/v3/api-docs`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
+
+## Motivation
+
+This codebase demonstrates how a small Spring Boot API can evolve into a more production-minded service by adding:
+
+- secure authentication and authorization
+- consistent layering and separation of concerns
+- infrastructure through containers
+- cache-backed optimizations
+- metrics and dashboards
+- repeatable load testing
+
+## Project location
+
+The Spring Boot application root is in the `backend` folder.

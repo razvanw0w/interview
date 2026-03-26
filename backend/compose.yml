@@ -39,3 +39,15 @@ services:
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+  k6:
+    image: grafana/k6
+    volumes:
+      - ./testing/k6:/scripts:ro
+    environment:
+      BASE_URL: http://app:8080/api
+      USERNAME: admin
+      PASSWORD: admin123
+    command: run /scripts/load.js
+    depends_on:
+      - app
