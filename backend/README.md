@@ -44,7 +44,7 @@ This project goes beyond a basic CRUD exercise by including:
 
 - `backend/` — Spring Boot application
 - `observability/` — Prometheus and Grafana provisioning
-- `qa/k6/` — load test scripts
+- `testing/k6/` — load test scripts
 - `testing/results/` — result screenshots and test artifacts
 - `docs/` — supporting project documentation
 
